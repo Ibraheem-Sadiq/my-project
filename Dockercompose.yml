@@ -1,0 +1,19 @@
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+
+  mongo:
+    build: ./mongo
+    ports:
+      - "27017:27017"

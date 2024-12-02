@@ -1,0 +1,65 @@
+- name: Install jenkin
+  hosts: ec2
+  tasks:
+    - name: Install Java
+      apt:
+        name: openjdk-11-jdk
+        state: latest
+        update_cache: yes
+
+    - name: Install Git
+      apt:
+        name: git
+        state: latest
+        update_cache: yes
+
+    - name: Add Jenkins repository key
+      apt_key:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        state: present
+        ce
+
+    - name: Add Jenkins repository
+      apt_repository:
+        repo: 'deb https://pkg.jenkins.io/debian-stable binary/'
+        state: present
+      vars:
+        ansible_python_interpreter: /usr/bin/python3.8
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+
+    
+    - name: enable Jenkins service
+      service:
+        name: jenkins
+        enabled: yes
+
+    - name: Start and 
+      systemd:
+        name: jenkins
+        state: started
+
+    - name: Generate Jenkins One Time Password
+      shell: cat /var/lib/jenkins/secrets/initialAdminPassword || true
+      register: Password
+      notify: Displaying One Time Password
+
+    - name: Displaying One Time Password
+      debug:
+        var: Password.stdout
+
+    - name: Install Jenkins plugins
+      jenkins_plugin:
+        name: "{{ item }}"
+      with_items:
+        - git
+        - ansible
+        - workflow-aggregator
+

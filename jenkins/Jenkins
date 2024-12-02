@@ -1,0 +1,49 @@
+pipeline {
+  agent any
+  environment {
+    AWS_ACCESS_KEY_ID = credentials('aws_access_key')
+    AWS_SECRET_ACCESS_KEY = credentials('aws_secret_key')
+    AWS_DEFAULT_REGION = "eu-west-3"
+    AWS_ACCOUNT_ID = '430118855091'
+
+    IMAGE_TAG = "${BUILD_NUMBER}"
+    BACKEND_REPO_URL = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_BACKEND_NAME}"
+    FRONTEND_REPO_URL = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/${ECR_FRONTEND_NAME}"
+  }
+  stages {
+    stage('Start The Pipeline') {
+      steps {
+        sh "aws ecr get-login-password --region ${env.AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+      }
+    }
+    stage('Build Image and Generate push it to ecr') {
+      steps {
+        script {
+          dir('backend') {
+            sh "docker build -t backend:${env.IMAGE_TAG} ."
+            sh "docker push ${env.BACKEND_REPO_URL}:${env.IMAGE_TAG}" 
+          }
+          dir('frontend') {
+            sh "docker build -t ${env.FRONTEND_REPO_URL}:${env.IMAGE_TAG} ."
+            sh "docker push ${env.FRONTEND_REPO_URL}:${env.IMAGE_TAG}" 
+          }
+        }
+      }
+    }
+  }
+
+  stage('Update EKS Cluster') {
+    steps {
+      script {
+        withCredentials([file(credentialsId: 'kubeconfig', variable: 'KUBECONFIG')]) {
+          sh "kubectl set image ./frontend-deployment frontend=${env.FRONTEND_REPO_URL}:latest --kubeconfig \$KUBECONFIG"
+          sh "kubectl set image ./backend-deployment backend=${env.BACKEND_REPO_URL}:latest --kubeconfig \$KUBECONFIG"
+          sh "kubectl set image ./mongo-deployment mongo=${env.MONGO_REPO_URL}:latest --kubeconfig \$KUBECONFIG"
+        }
+      }
+    }
+  }
+
+}
+
+
